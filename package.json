@@ -1,0 +1,23 @@
+{
+  "name": "immutable-crdt",
+  "version": "1.0.0",
+  "description": "A CRDT library that you can add to your existing codebase",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crcn/immutable-crdt.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/crcn/immutable-crdt/issues"
+  },
+  "homepage": "https://github.com/crcn/immutable-crdt#readme",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^6.2.0"
+  }
+}

@@ -1,2 +1,24 @@
-# crdt
-A CRDT library that you can add to your existing codebase
+CRDT library for immutable apps. Here's a simple:
+
+```javascript
+import {createDocument} from "immutable-crdt";
+
+let person = {
+  firstName: "a",
+  lastName: "b"
+};
+
+const doc = createDocument(person);
+const mutations = doc.update({...person, firstName: "a", lastName: "b"});
+
+const doc2 = createDocument(person);
+doc2.applyMutations(mutations);
+
+console.log(doc2.getState());
+```
+
+
+TODOS:
+
+- [ ] history
+- [ ] snapshotting state
