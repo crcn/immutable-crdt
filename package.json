@@ -4,7 +4,7 @@
   "description": "A CRDT library that you can add to your existing codebase",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha lib/test"
   },
   "repository": {
     "type": "git",
@@ -19,5 +19,10 @@
   "devDependencies": {
     "chai": "^4.2.0",
     "mocha": "^6.2.0"
+  },
+  "dependencies": {
+    "@types/chai": "^4.2.2",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.7.5"
   }
 }

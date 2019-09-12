@@ -6,11 +6,11 @@ import { Table, crdtItemCreator } from "./items";
 let _documentCount = 0;
 
 export class Document<TState> {
-  _changeObserver = new Observable<CRDTMutation[]>();
-  _currentState: TState;
-  _table: Table;
-  _itemCount: number = 0;
-  _idSeed: string = String(_documentCount++);
+  private _changeObserver = new Observable<CRDTMutation[]>();
+  private _currentState: TState;
+  private _table: Table;
+  private _itemCount: number = 0;
+  private _idSeed: string = String(_documentCount++);
   
   constructor(initialState: TState) {
     this._currentState = initialState;
@@ -18,6 +18,9 @@ export class Document<TState> {
   }
   onChange(handler: ObservableHandler<CRDTMutation[]>) {
     return this._changeObserver.observe(handler);
+  }
+  getStateMap() {
+    return this._table.getRoot();
   }
   update(newState: TState) {
     const ots = diff(this._currentState, newState);
@@ -27,7 +30,7 @@ export class Document<TState> {
   getState() {
     return this.getState();
   }
-  _generateId = () => {
+  private _generateId = () => {
     return `${this._idSeed}${++this._itemCount}`;
   }
 }

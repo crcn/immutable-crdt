@@ -22,3 +22,7 @@ TODOS:
 
 - [ ] history
 - [ ] snapshotting state
+
+Caveats:
+
+- Diffing method doesn't work for certain kinds 

@@ -6,6 +6,8 @@ export type BaseItemShape = {
   id: string;
 };
 
+type ItemTraverser = (item: BaseItem<any>) => void;
+
 export abstract class BaseItem<TShape extends BaseItemShape> implements BaseItemShape {
   readonly id: string;
   $$parent: BaseParent<any>;
@@ -29,6 +31,10 @@ export abstract class BaseItem<TShape extends BaseItemShape> implements BaseItem
   private _onChange = () => {
     this._jsonCache = null;
   }
+
+  traverse(handler: ItemTraverser) {
+    handler(this);
+  }
 }
 
 abstract class BaseParent<TShape extends BaseItemShape> extends BaseItem<TShape> {
@@ -45,7 +51,6 @@ abstract class BaseParent<TShape extends BaseItemShape> extends BaseItem<TShape>
       child.changeObserver.unobserve(this.changeObserver.dispatch);
     }
   }
-  
 }
 
 export const isParentCRDTItem = (item: CRDTItem): item is List | Map => {
@@ -86,6 +91,12 @@ export class List extends BaseParent<ListShape>  {
     this.unlinkChild(item);
     this.changeObserver.dispatch({ type: CRDTMutationType.DELETE, ref: item.id });
   }
+  traverse(handler: ItemTraverser) {
+    super.traverse(handler);
+    for (const item of this._items) {
+      item.traverse(handler);
+    }
+  }
   _toJSON() {
     return {
       id: this.id,
@@ -108,12 +119,20 @@ export class Map extends BaseParent<MapShape> implements MapShape {
     return this._properties;
   }
   setValue(propertyName: string, value: CRDTItem) {
-    value.$$parent = this;
+    this.linkChild(value);
     if (this._properties[propertyName]) {
+      this.unlinkChild(this._properties[propertyName]);
       this.changeObserver.dispatch({ type: CRDTMutationType.DELETE, ref: this._properties[propertyName].id });
     }
     this._properties[propertyName] = value;
     this.changeObserver.dispatch({ type: CRDTMutationType.MAP_SET, ref: this.id, propertyName, value });
+  }
+  traverse(handler: ItemTraverser) {
+    super.traverse(handler);
+    for (const key in this._properties) {
+      const value = this._properties[key];
+      value.traverse(handler);
+    }
   }
   getValue(key: string) {
     return this._properties[key];
@@ -125,7 +144,7 @@ export class Map extends BaseParent<MapShape> implements MapShape {
     }
     return {
       id: this.id,
-      properties: this._properties
+      properties,
     }
   }
 }
@@ -157,11 +176,18 @@ export class Table {
   private _items: KeyValue<BaseItemShape>;
   private _root: CRDTItem;
   constructor(root: CRDTItem) {
+    this._items = {};
     this._root = root;
     this._root.changeObserver.observe(this._onRootChange);
+    this._root.traverse((item) => {
+      this._items[item.id] = item;
+    });
   }
   getItem(id: string): BaseItemShape {
     return this._items[id];
+  }
+  getRoot() {
+    return this._root;
   }
   private _onRootChange = (mutation: CRDTMutation) => {
     switch(mutation.type) {
