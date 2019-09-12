@@ -9,7 +9,7 @@ let person = {
 };
 
 const doc = createDocument(person);
-const mutations = doc.update({...person, firstName: "a", lastName: "b"});
+const mutations = doc.update({...person, firstName: "blah", lastName: "blah"});
 
 const doc2 = createDocument(person);
 doc2.applyMutations(mutations);
