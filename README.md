@@ -9,14 +9,10 @@ let person = {
 };
 
 const doc2 = Document.fromState(person);
-const doc = Document.create(person);
-doc.changeObservable.observe(mutation => {
-  doc2.applyMutation(mutation);
-}); 
+const doc = Document.fromState(person);
 const mutations = doc.update({...person, firstName: "blah", lastName: "blah"});
 
-
-console.log(doc2.getState());
+doc2.applyMutations(mutation);
 ```
 
 

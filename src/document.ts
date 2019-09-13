@@ -14,7 +14,12 @@ export class Document<TState> {
   
   update(newState: TState) {
     const ots = diff(this._record.getState(), newState);
+    const mutations = [];
+    const onMutation = (mutation: Mutation) => mutations.push(mutation);
+    this._record.changeObservable.observe(onMutation);    
     patchRecord(this._record, ots, this._createRecord);
+    this._record.changeObservable.unobserve(onMutation);
+    return mutations;
   }
   toJSON(): DocumentData {
     return this._record.toJSON();
@@ -24,6 +29,9 @@ export class Document<TState> {
   }
   applyMutation(mutation: Mutation) {
     this._table.getItem(mutation.target).applyMutation(mutation);
+  }
+  applyMutations(mutations: Mutation[]) {
+    mutations.forEach(mutation => this.applyMutation(mutation));
   }
   private _initialize(record: Record, createRecord: RecordCreator) {
     this._createRecord = createRecord;
