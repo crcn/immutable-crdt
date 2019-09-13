@@ -8,11 +8,13 @@ let person = {
   lastName: "b"
 };
 
-const doc = createDocument(person);
+const doc2 = Document.fromState(person);
+const doc = Document.create(person);
+doc.changeObservable.observe(mutation => {
+  doc2.applyMutation(mutation);
+}); 
 const mutations = doc.update({...person, firstName: "blah", lastName: "blah"});
 
-const doc2 = createDocument(person);
-doc2.applyMutations(mutations);
 
 console.log(doc2.getState());
 ```
@@ -21,11 +23,13 @@ console.log(doc2.getState());
 TODOS:
 
 - [ ] history
+- [ ] cache mutations that
 - [ ] snapshotting state for performance
 - [ ] benchmark testing
 - [ ] persistence
 - [ ] conflict resolution
 - [ ] pubnub examples
+- [ ] prevent applied mutations from being 
 
 Caveats:
 

@@ -3,7 +3,7 @@ import { Document } from "../index";
 
 describe(__filename + "#", () => {
   it("can create a simple document from a vanilla object", () => {    
-    const doc = new Document({
+    const doc = Document.fromState({
       firstName: "Joe",
       lastName: "Shmo"
     });
@@ -13,7 +13,18 @@ describe(__filename + "#", () => {
       firstName: "Joe",
       lastName: "Shmo"
     }  
-    const doc = new Document(state);
+    const doc = Document.fromState(state);
     doc.update({...state, firstName: "Jeff"})
+  });
+
+  it("can deserialize a document", () => {
+    const state = {
+      firstName: "Joe",
+      lastName: "Shmo"
+    }  
+    const doc = Document.fromState(state);
+    expect(doc.getState()).to.eql(state);
+    const doc2 = Document.deserialize(doc.toJSON());
+    expect(doc2.getState()).to.eql(state);
   });
 });

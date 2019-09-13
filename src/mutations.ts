@@ -10,6 +10,7 @@ export enum MutationType {
 
 export type BaseMutation<TType extends MutationType> = {
   type: TType,
+  target: string,
   timestamp: number
 };
 
@@ -19,16 +20,12 @@ export type Insert = {
 } & BaseMutation<MutationType.INSERT>;
 
 export type Append = {
-  parent: string;
   value: RecordData;
 } & BaseMutation<MutationType.APPEND>;
 
-export type Delete = {
-  ref: string;
-} & BaseMutation<MutationType.DELETE>;
+export type Delete = BaseMutation<MutationType.DELETE>;
 
 export type MapSet = {
-  ref: string;
   propertyName: string;
   value: RecordData;
 } & BaseMutation<MutationType.MAP_SET>;

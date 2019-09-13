@@ -12,18 +12,26 @@ type HistoryData = {
   mutations: Mutation[]
 };
 
-export class History {
-  private _record: Record;
+export class History<TState> {
+  private _cursor: number;
   private _snapshots: Snapshot[] = [];
   private _mutations: Mutation[] = [];
   constructor(readonly source: Record, readonly snapshotInterval = DEFAULT_SNAPSHOT_INTERVAL) {
-    this._record.changeObserver.observe(this.onRecordChanged);
+    // this._record.changeObservable.observe(this.onRecordChanged);
   }
   onRecordChanged = (mutation: Mutation) => { 
     this._mutations.push(mutation);
     if (this._mutations.length % this.snapshotInterval === 0) {
-      this._snapshots.push(new Snapshot(this._record.toJSON()));
+      // this._snapshots.push(new Snapshot(this._record.clone()));
     }
+  }
+  getCurrentRecord() {
+  }
+  back() {
+
+  }
+  forward() {
+    
   }
   toJSON(): HistoryData {
     return {
@@ -38,12 +46,12 @@ type SnapshotData = {
 };
 
 class Snapshot {
-  constructor(readonly record: RecordData) {
+  constructor(readonly record: Record) {
 
   }
   toJSON(): SnapshotData {
     return {
-      record: this.record
+      record: this.record.toJSON()
     };
   }
 }

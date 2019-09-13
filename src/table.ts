@@ -12,7 +12,7 @@ export class Table {
   constructor(root: Record) {
     this._items = {};
     this._root = root;
-    this._root.changeObserver.observe(this._onRootChange);
+    this._root.changeObservable.observe(this._onRootChange);
     this._root.traverse((item) => {
       this._items[item.id] = item as Record;
     });
@@ -26,7 +26,7 @@ export class Table {
   private _onRootChange = (mutation: Mutation) => {
     switch(mutation.type) {
       case MutationType.DELETE: {
-        delete this._items[mutation.ref];
+        delete this._items[mutation.target];
         break;
       }
       case MutationType.MAP_SET:
