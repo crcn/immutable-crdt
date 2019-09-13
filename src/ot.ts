@@ -58,15 +58,19 @@ const mov = (newPath: Key[], path: Key[]): Move => ({ type: OTMutationType.MOVE,
 const upd = (value: any, path: Key[]): Update => ({ type: OTMutationType.UPDATE, value, path });
 
 const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OTMutation[]) => {
-  const oldHash = arrayToHash(oldArray);
-  const newHash = arrayToHash(newArray);
   const model = oldArray.concat();
 
   // insert, update, move
-  for (let i = 0, {length} = newArray; i < length; i++) {
+  for (let i = 0, n = newArray.length; i < n; i++) {
     const newItem = newArray[i];
-    const newItemId = newItem && newItem.id || i;
-    const oldItem = oldHash[newItemId];
+    let oldItem;
+    for (let j = i, n2 = oldArray.length; j < n2; j++) {
+      const item = oldArray[j];
+      if (newItem === oldItem) {
+        oldItem = item;
+        break;
+      }
+    }
     const newChildPath = [...path, i];
 
     if (i >= model.length) {
@@ -74,10 +78,18 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
     // does not exist
     } else if (oldItem == null) {
       const replItem = oldArray[i];
-      const replItemId = replItem && replItem.id || i;
+
+      let existing;
+      for (let k = i, n = newArray.length; k < n; k++) {
+        const item = newArray[k];
+        if (replItem === item) {
+          existing = replItem;
+          break;
+        }
+      }
 
       // if the item exists, then just insert the new item -- we'll get to it eventually
-      if (newHash.hasOwnProperty(replItemId)) {
+      if (existing) {
         model.splice(i, 0, newItem);
       } else {
 
@@ -110,6 +122,7 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
   return operations;
 };
 
+
 const diffObject = (oldItem: any, newItem: any, path: Key[], operations: OTMutation[]) => {
   for (const key in oldItem) {
     if (newItem[key] == null && oldItem[key] != null) {
@@ -127,16 +140,6 @@ const diffObject = (oldItem: any, newItem: any, path: Key[], operations: OTMutat
 
   return operations;
 };
-
-
-const arrayToHash = (ary: any) => {
-  const hash = {};
-  for (let i = 0, {length} = ary; i < length; i++) {
-    const item = ary[i];
-    hash[item && item.id || i] = item;
-  }
-  return hash;
-}
 
 export const patchC2 = (oldItem: any, operations: OTMutation[]) => operations.reduce((oldItem, operation) => {  
   let parent = oldItem;
