@@ -18,6 +18,7 @@ doc2.applyMutations(mutations);
 
 TODOS:
 
+- [ ] remove ID check 
 - [ ] history
 - [ ] cache mutations that
 - [ ] snapshotting state for performance
