@@ -1,44 +1,40 @@
-import { arraySplice } from "./utils";
+/**
+ */
 
+import { arraySplice } from "./utils";
+import { Record, Map, List } from "./records";
 
 type Key = string | number;
 
-export enum OTOperationType {
+enum OTMutationType {
   INSERT,
   DELETE,
   UPDATE,
   MOVE
 };
 
-export type BaseOperation<TType extends OTOperationType> = {
+type BaseOTMutation<TType extends OTMutationType> = {
   type: TType
   path: Key[]
 };
 
-export type Insert = {
+type Insert = {
   value: any;
-} & BaseOperation<OTOperationType.INSERT>;
+} & BaseOTMutation<OTMutationType.INSERT>;
 
-export type Delete = {} & BaseOperation<OTOperationType.DELETE>;
+type Delete = {} & BaseOTMutation<OTMutationType.DELETE>;
 
-export type Update = {
+type Update = {
   value: any;
-} & BaseOperation<OTOperationType.UPDATE>;
+} & BaseOTMutation<OTMutationType.UPDATE>;
 
-export type Move = {
+type Move = {
   newPath: Key[];
-} & BaseOperation<OTOperationType.MOVE>;
+} & BaseOTMutation<OTMutationType.MOVE>;
 
-export type Operation = Insert | Delete | Update | Move;
+export type OTMutation = Insert | Delete | Update | Move;
 
-let _opCount = 0;
-let _opSeed = String(Math.round(Math.random() * 9999)) + String(Date.now());
-
-const generateId = () => {
-  return `${_opSeed}${_opCount++}`;
-};
-
-export const diff = (oldItem: any, newItem: any, path: Key[] = [], operations: Operation[] = []) => {
+export const diff = (oldItem: any, newItem: any, path: Key[] = [], operations: OTMutation[] = []) => {
   if (oldItem === newItem) {
     return operations;
   }
@@ -56,12 +52,12 @@ export const diff = (oldItem: any, newItem: any, path: Key[] = [], operations: O
   return operations;
 };
 
-const del = (path: Key[]): Delete => ({ type: OTOperationType.DELETE, path });
-const ins = (value: any, path: Key[]): Insert => ({ type: OTOperationType.INSERT, value, path });
-const mov = (newPath: Key[], path: Key[]): Move => ({ type: OTOperationType.MOVE, newPath, path });
-const upd = (value: any, path: Key[]): Update => ({ type: OTOperationType.UPDATE, value, path });
+const del = (path: Key[]): Delete => ({ type: OTMutationType.DELETE, path });
+const ins = (value: any, path: Key[]): Insert => ({ type: OTMutationType.INSERT, value, path });
+const mov = (newPath: Key[], path: Key[]): Move => ({ type: OTMutationType.MOVE, newPath, path });
+const upd = (value: any, path: Key[]): Update => ({ type: OTMutationType.UPDATE, value, path });
 
-const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: Operation[]) => {
+const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OTMutation[]) => {
   const oldHash = arrayToHash(oldArray);
   const newHash = arrayToHash(newArray);
   const model = oldArray.concat();
@@ -114,7 +110,7 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: Op
   return operations;
 };
 
-const diffObject = (oldItem: any, newItem: any, path: Key[], operations: Operation[]) => {
+const diffObject = (oldItem: any, newItem: any, path: Key[], operations: OTMutation[]) => {
   for (const key in oldItem) {
     if (newItem[key] == null && oldItem[key] != null) {
       operations.push(del([...path, key]));
@@ -142,7 +138,7 @@ const arrayToHash = (ary: any) => {
   return hash;
 }
 
-export const patch2 = (oldItem: any, operations: Operation[]) => operations.reduce((oldItem, operation) => {  
+export const patchC2 = (oldItem: any, operations: OTMutation[]) => operations.reduce((oldItem, operation) => {  
   let parent = oldItem;
   for (let i = 0, n = operation.path.length - 1; i < n; i++) {
     parent = parent[operation.path[i]];
@@ -151,7 +147,7 @@ export const patch2 = (oldItem: any, operations: Operation[]) => operations.redu
   const property = operation.path[operation.path.length - 1];
 
   switch(operation.type) {
-    case OTOperationType.DELETE: {
+    case OTMutationType.DELETE: {
       if (typeof property === "number") {
         parent = arraySplice(parent, property, 1);
       } else {
@@ -160,7 +156,7 @@ export const patch2 = (oldItem: any, operations: Operation[]) => operations.redu
       }
       break;
     } 
-    case OTOperationType.UPDATE: {
+    case OTMutationType.UPDATE: {
       if (typeof property === "number") {
         parent = arraySplice(parent, property, 1, operation.value);
       } else {
@@ -168,7 +164,7 @@ export const patch2 = (oldItem: any, operations: Operation[]) => operations.redu
       }
       break;
     }
-    case OTOperationType.INSERT: {
+    case OTMutationType.INSERT: {
       if (typeof property === "number") {
         parent = arraySplice(parent, property, 0, operation.value);
       } else {
@@ -176,7 +172,7 @@ export const patch2 = (oldItem: any, operations: Operation[]) => operations.redu
       }
       break;
     }
-    case OTOperationType.MOVE: {
+    case OTMutationType.MOVE: {
       const value = parent[property];
       const newProperty = operation.newPath[operation.newPath.length - 1];
       if (typeof property === "number") {
@@ -210,3 +206,61 @@ const updatedNestedValue = (ancestor: any, value: any, path: Key[], depth: numbe
     [property]: updatedNestedValue(ancestor[property], value, path, depth)
   };
 };
+
+export const patchRecord = (item: Record, mutations: OTMutation[], createRecord: (value: any) => Record) => {
+  for (const mutation of mutations) {
+    let parent: Record = item;
+    for (let i = 0, n = mutation.path.length - 1; i < n; i++) {
+      const pathPart = mutation.path[i];
+      if (parent instanceof Map) {
+        parent = parent.properties[pathPart];
+      } else if (parent instanceof List) {
+        parent = parent.items[pathPart];
+      }
+    }
+
+    const property = mutation.path[mutation.path.length - 1];
+
+    if (parent instanceof List && typeof property === "number") { 
+      switch (mutation.type) {
+        case OTMutationType.DELETE: {
+          parent.removeAt(property);
+          break;
+        }
+        case OTMutationType.UPDATE: {
+          parent.removeAt(property);
+          parent.insert(property, createRecord(mutation.value));
+          break;
+        }
+        case OTMutationType.INSERT: {
+          parent.insert(property, createRecord(mutation.value));
+          break;
+        }
+        case OTMutationType.MOVE: {
+          const item = parent.items[property];
+          parent.remove(item);
+          parent.insert(Number(mutation.newPath[mutation.newPath.length - 1]), item);
+          break;
+        }
+      }
+    } else if (parent instanceof Map && typeof property === "string") {
+      switch (mutation.type) {
+        case OTMutationType.DELETE: {
+          parent.removeValue(property);
+          break;
+        }
+        case OTMutationType.INSERT:
+        case OTMutationType.UPDATE: {
+          parent.setValue(property, createRecord(mutation.value));
+          break;
+        }
+        case OTMutationType.MOVE: {
+          const item = parent.getValue(property);
+          parent.removeValue(property);
+          parent.setValue(String(mutation.newPath[mutation.newPath.length - 1]), item);
+          break;
+        }
+      }
+    }
+  }
+}

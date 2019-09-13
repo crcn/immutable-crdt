@@ -7,7 +7,13 @@ describe(__filename + "#", () => {
       firstName: "Joe",
       lastName: "Shmo"
     });
-
-    console.log(doc.getStateMap().toJSON());
+  });
+  it("change a simple document", () => {  
+    const state = {
+      firstName: "Joe",
+      lastName: "Shmo"
+    }  
+    const doc = new Document(state);
+    doc.update({...state, firstName: "Jeff"})
   });
 });

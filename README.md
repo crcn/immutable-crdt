@@ -21,8 +21,11 @@ console.log(doc2.getState());
 TODOS:
 
 - [ ] history
-- [ ] snapshotting state
+- [ ] snapshotting state for performance
+- [ ] benchmark testing
+- [ ] persistence
+- [ ] conflict resolution
 
 Caveats:
 
-- Diffing method doesn't work for certain kinds 
+- Diffing method doesn't work for certain scenarios such as `incrementing`
