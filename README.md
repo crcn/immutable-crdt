@@ -12,7 +12,7 @@ const doc2 = Document.fromState(person);
 const doc = Document.fromState(person);
 const mutations = doc.update({...person, firstName: "blah", lastName: "blah"});
 
-doc2.applyMutations(mutation);
+doc2.applyMutations(mutations);
 ```
 
 
