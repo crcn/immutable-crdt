@@ -13,6 +13,7 @@ const doc = Document.initialize(person);
 const mutations = doc.updateState({...person, firstName: "blah", lastName: "blah"});
 
 doc2.applyMutations(mutations);
+console.log(doc2.getState()); // { firstName: "blah", lastName: "blah" }
 ```
 
 
