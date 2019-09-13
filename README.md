@@ -1,16 +1,16 @@
 CRDT library for immutable apps. Here's a simple:
 
 ```javascript
-import {createDocument} from "immutable-crdt";
+import {Document} from "immutable-crdt";
 
 let person = {
   firstName: "a",
   lastName: "b"
 };
 
-const doc2 = Document.fromState(person);
-const doc = Document.fromState(person);
-const mutations = doc.update({...person, firstName: "blah", lastName: "blah"});
+const doc2 = Document.initialize(person);
+const doc = Document.initialize(person);
+const mutations = doc.updateState({...person, firstName: "blah", lastName: "blah"});
 
 doc2.applyMutations(mutations);
 ```
