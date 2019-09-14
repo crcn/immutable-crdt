@@ -54,20 +54,26 @@ export const diff = (oldItem: any, newItem: any, path: Key[] = [], operations: O
 
 const del = (path: Key[]): Delete => ({ type: OTMutationType.DELETE, path });
 const ins = (value: any, path: Key[]): Insert => ({ type: OTMutationType.INSERT, value, path });
-const mov = (newPath: Key[], path: Key[]): Move => ({ type: OTMutationType.MOVE, newPath, path });
+const mov = (path: Key[], newPath: Key[]): Move => ({ type: OTMutationType.MOVE, newPath, path });
 const upd = (value: any, path: Key[]): Update => ({ type: OTMutationType.UPDATE, value, path });
 
 const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OTMutation[]) => {
   const model = oldArray.concat();
 
+  let used = {};
+
   // insert, update, move
   for (let i = 0, n = newArray.length; i < n; i++) {
     const newItem = newArray[i];
     let oldItem;
-    for (let j = i, n2 = oldArray.length; j < n2; j++) {
+    for (let j = 0, n2 = oldArray.length; j < n2; j++) {
+      if (used[j])  {
+        continue;
+      }
       const item = oldArray[j];
-      if (newItem === oldItem) {
+      if (newItem === item) {
         oldItem = item;
+        used[j] = 1;
         break;
       }
     }
@@ -92,7 +98,6 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
       if (existing) {
         model.splice(i, 0, newItem);
       } else {
-
         // otherwise, remove the item since it doesn't exist
         model.splice(i, 1, newItem);
         operations.push(del(newChildPath));
@@ -102,7 +107,7 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
 
     // exists
     } else {
-      const oldIndex = model.indexOf(oldItem);
+      const oldIndex = model.indexOf(oldItem, i);
       if (oldIndex !== i) {
         model.splice(oldIndex, 1);
         model.splice(i, 0, oldItem);
@@ -141,75 +146,6 @@ const diffObject = (oldItem: any, newItem: any, path: Key[], operations: OTMutat
   return operations;
 };
 
-export const patchC2 = (oldItem: any, operations: OTMutation[]) => operations.reduce((oldItem, operation) => {  
-  let parent = oldItem;
-  for (let i = 0, n = operation.path.length - 1; i < n; i++) {
-    parent = parent[operation.path[i]];
-  }
-
-  const property = operation.path[operation.path.length - 1];
-
-  switch(operation.type) {
-    case OTMutationType.DELETE: {
-      if (typeof property === "number") {
-        parent = arraySplice(parent, property, 1);
-      } else {
-        parent = {...parent};
-        delete parent[property];
-      }
-      break;
-    } 
-    case OTMutationType.UPDATE: {
-      if (typeof property === "number") {
-        parent = arraySplice(parent, property, 1, operation.value);
-      } else {
-        parent = {...parent, [property]: operation.value};
-      }
-      break;
-    }
-    case OTMutationType.INSERT: {
-      if (typeof property === "number") {
-        parent = arraySplice(parent, property, 0, operation.value);
-      } else {
-        parent = {...parent, [property]: operation.value};
-      }
-      break;
-    }
-    case OTMutationType.MOVE: {
-      const value = parent[property];
-      const newProperty = operation.newPath[operation.newPath.length - 1];
-      if (typeof property === "number") {
-        parent = arraySplice(parent, property, 1);
-        parent = arraySplice(parent, Number(newProperty), 0, value);
-      } else {
-        parent = {...parent};
-        delete parent[property];
-        parent[newProperty] = value;
-      }
-    }
-  }
-
-  return updatedNestedValue(oldItem, parent, operation.path.slice(0, operation.path.length - 1), 0);
-}, oldItem);
-
-const updatedNestedValue = (ancestor: any, value: any, path: Key[], depth: number) => {
-  if (depth === path.length) {
-    return value;
-  }
-
-  const property = path[depth];
-
-  if (Array.isArray(ancestor)) {
-    const index = Number(path[depth]);
-    return arraySplice(ancestor, index, 1, updatedNestedValue(ancestor[index], value, path, depth + 1));
-  }
-
-  return {
-    ...ancestor,
-    [property]: updatedNestedValue(ancestor[property], value, path, depth)
-  };
-};
-
 export const patchRecord = (item: Record, mutations: OTMutation[], createRecord: (value: any) => Record) => {
   for (const mutation of mutations) {
     let parent: Record = item;
@@ -221,6 +157,7 @@ export const patchRecord = (item: Record, mutations: OTMutation[], createRecord:
         parent = parent.items[pathPart];
       }
     }
+
 
     const property = mutation.path[mutation.path.length - 1];
 

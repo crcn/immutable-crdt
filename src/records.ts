@@ -1,6 +1,6 @@
 import { KeyValue } from "./utils";
 import { Observable } from "./observable";
-import { Mutation, MutationType } from "./mutations";
+import { Mutation, MutationType, Insert, Append } from "./mutations";
 
 export enum RecordType {
   MAP = "MAP",
@@ -42,13 +42,21 @@ export abstract class BaseRecord<TType extends RecordType, TData extends BaseRec
     }
     return this._stateCache = this._getState();
   }
+  applyMutation(mutation: Mutation): void {
+    switch(mutation.type) {
+      case MutationType.DELETE: {
+        this.$$parent.remove(this);
+        break;
+      }
+    }
+  }
   abstract clone();
-  abstract applyMutation(mutation: Mutation): void;
   protected abstract _getState(): any;
   protected abstract _toJSON(): TData;
 
   private _onChange = () => {
     this._jsonCache = null;
+    this._stateCache = null;
   }
 
   traverse(handler: ItemTraverser) {
@@ -63,6 +71,8 @@ abstract class BaseParent<TType extends RecordType, TData extends BaseRecordData
       child.changeObservable.observe(this.changeObservable.dispatch);
     }
   }
+
+  abstract remove(child: BaseRecord<any, any>);
 
   protected unlinkChild(child: Record) {
     child.$$parent = this;
@@ -85,6 +95,9 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   constructor(id: string, items: Record[]) {
     super(id, RecordType.LIST);
     this._items = items;
+    for (let i = 0, {length} = this._items; i < length; i++) {
+      this._items[i].$$parent = this;
+    }
   }
   get items() {
     return this._items;
@@ -94,7 +107,19 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     this.insert(this._items.length, item);
   }
   applyMutation(mutation: Mutation) {
-    console.log('TODO');
+    super.applyMutation(mutation);
+    switch(mutation.type) {
+      case MutationType.APPEND: {
+        this.push($castRecord(mutation.value));
+        break;
+      }
+      case MutationType.INSERT: {
+        const beforeIndex = this._items.findIndex(item => item.id === mutation.before);
+        // TODO - return conflict if before not found
+        this.insert(beforeIndex, $castRecord(mutation.value));
+        break;
+      }
+    }
     this.changeObservable.dispatch(mutation);
   }
   clone() {
@@ -105,7 +130,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   insert(index: number, item: Record) {
     this.linkChild(item);
     this._items.splice(index, 0, item);
-    if (index >= this._items.length) {
+    if (index < this._items.length - 1) {
       this.changeObservable.dispatch({ type: MutationType.INSERT, before: this._items[index + 1].id, value: item, timestamp: Date.now(), target: this.id });
     } else {
       this.changeObservable.dispatch({ type: MutationType.APPEND, target: this.id, value: item, timestamp: Date.now() });
@@ -116,15 +141,16 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     if (index === -1) {
       return;
     }
-    this.unlinkChild(item);
-    this.changeObservable.dispatch({ type: MutationType.DELETE, target: item.id, timestamp: Date.now() });
+    this.removeAt(index);
   }
   removeAt(index: number) {
     const item = this._items[index];
     if (!item) {
       return;
     }
-    return this.remove(item);
+    this._items.splice(index, 1);
+    this.unlinkChild(item);
+    this.changeObservable.dispatch({ type: MutationType.DELETE, target: item.id, timestamp: Date.now() });
   }
   traverse(handler: ItemTraverser) {
     super.traverse(handler);
@@ -154,6 +180,9 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
   constructor(id: string, properties: KeyValue<Record>) {
     super(id, RecordType.MAP);
     this._properties = properties;
+    for (const key in this._properties) {
+      this._properties[key].$$parent = this;
+    }
   }
   get properties() {
     return this._properties;
@@ -166,16 +195,32 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
     return new Map(this.id, clonedProperties);
   }
   applyMutation(mutation: Mutation) {
+    super.applyMutation(mutation);
     this.changeObservable.dispatch(mutation);
   }
   setValue(propertyName: string, value: Record) {
-    this.linkChild(value);
+    if (value) {
+      this.linkChild(value);
+    }
     if (this._properties[propertyName]) {
       this.unlinkChild(this._properties[propertyName]);
       this.changeObservable.dispatch({ type: MutationType.DELETE, target: this._properties[propertyName].id, timestamp: Date.now() });
     }
-    this._properties[propertyName] = value;
+    if (value == null) {
+      delete this._properties[propertyName];
+    } else {
+      this._properties[propertyName] = value;
+    }
     this.changeObservable.dispatch({ type: MutationType.MAP_SET, target: this.id, propertyName, value, timestamp: Date.now() });
+  }
+  remove(value: Record) {
+    for (const propertyName in this._properties) {
+      const item = this._properties[propertyName];
+      if (item.id === value.id) {
+        this.removeValue(propertyName);
+        break;
+      }
+    }
   }
   removeValue(propertyName: string) {
     this.setValue(propertyName, undefined);
@@ -230,6 +275,7 @@ export class Primitive extends BaseRecord<RecordType.PRIMITIVE, PrimitiveData> i
     return new Primitive(this.id, this._value);
   }
   applyMutation(mutation: Mutation) {
+    super.applyMutation(mutation);
     this.changeObservable.dispatch(mutation);
   }
   _toJSON() {
@@ -292,4 +338,8 @@ export const $deserializeRecord = (item: RecordData) => {
       return new List(item.id, item.items.map($deserializeRecord));
     }
   }
+}
+
+const $castRecord = (record: RecordData) => {
+  return record instanceof BaseRecord ? record : $deserializeRecord(record);
 }

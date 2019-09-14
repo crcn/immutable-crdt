@@ -31,7 +31,6 @@ export class Document<TState> {
   updateState(newState: TState) {
 
     // first capture the operational transforms between the old & new state
-    
     const ots = diff(this._mirror.getState(), newState);
     const mutations = [];
     const onMutation = (mutation: Mutation) => mutations.push(mutation);
@@ -77,7 +76,6 @@ export class Document<TState> {
   }
 
   /**
-   * 
    */
 
   static deserialize = <TState>(data: DocumentData) => {
