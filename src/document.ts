@@ -1,5 +1,6 @@
 import { Observable } from "./observable";
 import { Mutation } from "./mutations";
+import {CRDTError, TargetNotFoundError} from "./errors";
 import { diff, patchRecord } from "./ot";
 import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator } from "./records";
 import {Table} from "./table";
@@ -28,7 +29,7 @@ export class Document<TState> {
 
   private _mirror: Record;
   
-  updateState(newState: TState) {
+  updateState(newState: TState): Mutation[] {
 
     // first capture the operational transforms between the old & new state
     const ots = diff(this._mirror.getState(), newState);
@@ -51,11 +52,17 @@ export class Document<TState> {
   getState() {
     return this._mirror.getState();
   }
-  applyMutation(mutation: Mutation) {
-    this._table.getItem(mutation.target).applyMutation(mutation);
+  applyMutation(mutation: Mutation): CRDTError {
+    const target = this._table.getItem(mutation.targetId);
+    if (!target) {
+      return new TargetNotFoundError(`target ${mutation.targetId} not found`);
+    }
+    target.applyMutation(mutation);
   }
   applyMutations(mutations: Mutation[]) {
-    mutations.forEach(mutation => this.applyMutation(mutation));
+    mutations.forEach(mutation => {
+      this.applyMutation(mutation)
+    });
   }
   private _construct(record: Record, createRecord: RecordCreator) {
     this._createRecord = createRecord;

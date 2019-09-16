@@ -131,9 +131,9 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     this.linkChild(item);
     this._items.splice(index, 0, item);
     if (index < this._items.length - 1) {
-      this.changeObservable.dispatch({ type: MutationType.INSERT, before: this._items[index + 1].id, value: item, timestamp: Date.now(), target: this.id });
+      this.changeObservable.dispatch({ type: MutationType.INSERT, before: this._items[index + 1].id, value: item, timestamp: Date.now(), targetId: this.id });
     } else {
-      this.changeObservable.dispatch({ type: MutationType.APPEND, target: this.id, value: item, timestamp: Date.now() });
+      this.changeObservable.dispatch({ type: MutationType.APPEND, targetId: this.id, value: item, timestamp: Date.now() });
     }
   }
   remove(item: Record) {
@@ -150,7 +150,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     }
     this._items.splice(index, 1);
     this.unlinkChild(item);
-    this.changeObservable.dispatch({ type: MutationType.DELETE, target: item.id, timestamp: Date.now() });
+    this.changeObservable.dispatch({ type: MutationType.DELETE, targetId: item.id, timestamp: Date.now() });
   }
   traverse(handler: ItemTraverser) {
     super.traverse(handler);
@@ -204,14 +204,14 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
     }
     if (this._properties[propertyName]) {
       this.unlinkChild(this._properties[propertyName]);
-      this.changeObservable.dispatch({ type: MutationType.DELETE, target: this._properties[propertyName].id, timestamp: Date.now() });
+      this.changeObservable.dispatch({ type: MutationType.DELETE, targetId: this._properties[propertyName].id, timestamp: Date.now() });
     }
     if (value == null) {
       delete this._properties[propertyName];
     } else {
       this._properties[propertyName] = value;
     }
-    this.changeObservable.dispatch({ type: MutationType.MAP_SET, target: this.id, propertyName, value, timestamp: Date.now() });
+    this.changeObservable.dispatch({ type: MutationType.MAP_SET, targetId: this.id, propertyName, value, timestamp: Date.now() });
   }
   remove(value: Record) {
     for (const propertyName in this._properties) {

@@ -29,7 +29,16 @@ describe(__filename + "#", () => {
       replica.applyMutations(mutations);
       expect(replica.toJSON()).to.eql(doc.toJSON());
       expect(mutations.map(mutation => mutation.type)).to.eql(ops);
+    });
 
+    // basic convergence test
+    it(`can converge on two docs that share the same operations`, () => {
+      const doc1 = Document.initialize(a);
+      const doc2 = Document.initialize(b);
+      const mutations = doc1.updateState(b);
+      doc2.updateState(b);
+      doc2.applyMutations(mutations);
+      expect(doc2.toJSON()).to.eql(doc1.toJSON());
     });
   }))
 });

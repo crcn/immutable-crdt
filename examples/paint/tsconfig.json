@@ -7,9 +7,10 @@
     "module": "commonjs",
     "outDir": "lib",
     "jsx": "react",
+    "esModuleInterop": true,
     "experimentalDecorators": true
   },
-  "exclude": ["node_modules", "*-test", "*-old", "lib", "index.d.ts", "examples"],
+  "exclude": ["node_modules", "*-test", "*-old", "lib", "index.d.ts"],
   "filesGlob": ["./src/*.ts"],
   "rootDirs": ["node_modules"]
 }

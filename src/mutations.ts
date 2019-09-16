@@ -10,7 +10,7 @@ export enum MutationType {
 
 export type BaseMutation<TType extends MutationType> = {
   type: TType,
-  target: string,
+  targetId: string,
   timestamp: number
 };
 
