@@ -73,7 +73,7 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
       const item = oldArray[j];
       if (newItem === item) {
         oldItem = item;
-        used[j] = 1;
+        used[j] = true;
         break;
       }
     }
@@ -94,16 +94,16 @@ const diffArray = (oldArray: any[], newArray: any[], path: Key[], operations: OT
         }
       }
 
+      model.splice(i, 1, newItem);
+
       // if the item exists, then just insert the new item -- we'll get to it eventually
-      if (existing) {
-        model.splice(i, 0, newItem);
+      if (existing != null) {
+        operations.push(upd(newItem, newChildPath));
       } else {
-        // otherwise, remove the item since it doesn't exist
-        model.splice(i, 1, newItem);
         operations.push(del(newChildPath));
+        operations.push(ins(newItem, newChildPath));
       }
 
-      operations.push(ins(newItem, newChildPath));
 
     // exists
     } else {
@@ -168,8 +168,7 @@ export const patchRecord = (item: Record, mutations: OTMutation[], createRecord:
           break;
         }
         case OTMutationType.UPDATE: {
-          parent.removeAt(property);
-          parent.insert(property, createRecord(mutation.value));
+          parent.replace(property, createRecord(mutation.value));
           break;
         }
         case OTMutationType.INSERT: {
@@ -177,9 +176,7 @@ export const patchRecord = (item: Record, mutations: OTMutation[], createRecord:
           break;
         }
         case OTMutationType.MOVE: {
-          const item = parent.items[property];
-          parent.remove(item);
-          parent.insert(Number(mutation.newPath[mutation.newPath.length - 1]), item);
+          parent.move(property, Number(mutation.newPath[mutation.newPath.length - 1]));
           break;
         }
       }

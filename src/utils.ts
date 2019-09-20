@@ -37,3 +37,11 @@ export const arraySplice = <T>(
   ...replacements,
   ...target.slice(index + count)
 ];
+
+
+export const seed = `${Math.round(Math.random() * 9999)}`;
+let _idCount = 0;
+
+export const generateId = () => {
+  return `${seed}${++_idCount}`;
+}

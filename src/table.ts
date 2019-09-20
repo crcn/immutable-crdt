@@ -23,16 +23,28 @@ export class Table {
   getRoot() {
     return this._root;
   }
+  clone() {
+    return new Table(this._root.clone());
+  }
   private _onRootChange = (mutation: Mutation) => {
     switch(mutation.type) {
       case MutationType.DELETE: {
-        delete this._items[mutation.target];
+        delete this._items[mutation.targetId];
+        break;
+      }
+
+      case MutationType.REPLACE_LIST_ITEM: {
+        delete this._items[mutation.itemId];
+        this._items[mutation.value.id] = mutation.value as Record;
         break;
       }
       case MutationType.MAP_SET:
-      case MutationType.APPEND:
       case MutationType.INSERT: {
-        this._items[mutation.value.id] = mutation.value as Record;
+        if (mutation.value == null) {
+          delete this._items[mutation.value.id];
+        } else {
+          this._items[mutation.value.id] = mutation.value as Record;
+        }
         break;
       }
     }

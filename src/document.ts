@@ -1,21 +1,20 @@
 import { Observable } from "./observable";
-import { Mutation } from "./mutations";
+import { Mutation, sortMutations } from "./mutations";
 import {CRDTError, TargetNotFoundError} from "./errors";
 import { diff, patchRecord } from "./ot";
 import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator } from "./records";
 import {Table} from "./table";
+import { generateId, seed } from "./utils";
 
 type DocumentData = {} & RecordData;
 
 
 export class Document<TState> {
 
-  /**
-   * Maintains an ID reference of each record for quick access
-   * when updates happen.
-   */
+  private _snapshot: Table;
 
-  private _table: Table;
+  private _mutations: Mutation[];
+
 
   /**
    * Creates a new record from a vanilla state value
@@ -27,47 +26,58 @@ export class Document<TState> {
    * CRDT mirror of the document state
    */
 
-  private _mirror: Record;
+  private _mirror: Table;
   
   updateState(newState: TState): Mutation[] {
 
+    const mirrorRecord = this._mirror.getRoot();
+
     // first capture the operational transforms between the old & new state
-    const ots = diff(this._mirror.getState(), newState);
+    const ots = diff(mirrorRecord.getState(), newState);
     const mutations = [];
     const onMutation = (mutation: Mutation) => mutations.push(mutation);
 
     // collects mutations as operational transforms are applied to the state mirror record
-    this._mirror.changeObservable.observe(onMutation);    
+    mirrorRecord.changeObservable.observe(onMutation);    
 
     // apply the operational transforms to the mirror record
-    patchRecord(this._mirror, ots, this._createRecord);
-    this._mirror.changeObservable.unobserve(onMutation);
+    patchRecord(mirrorRecord, ots, this._createRecord);
+    mirrorRecord.changeObservable.unobserve(onMutation);
+
+    this._mutations.push(...mutations);
 
     // return the CRDT mutations which can later be used against other documents
     return mutations;
   }
   toJSON(): DocumentData {
-    return this._mirror.toJSON();
+    return this._mirror.getRoot().toJSON();
   }
   getState() {
-    return this._mirror.getState();
-  }
-  applyMutation(mutation: Mutation): CRDTError {
-    const target = this._table.getItem(mutation.targetId);
-    if (!target) {
-      return new TargetNotFoundError(`target ${mutation.targetId} not found`);
-    }
-    target.applyMutation(mutation);
+    return this._mirror.getRoot().getState();
   }
   applyMutations(mutations: Mutation[]) {
-    mutations.forEach(mutation => {
-      this.applyMutation(mutation)
-    });
+    this._mutations = sortMutations(this._mutations.concat(mutations));
+    const snapshotMirror = this._mirror.clone();
+
+    for (const mutation of this._mutations) {
+      const target = snapshotMirror.getItem(mutation.targetId);
+      if (!target) {
+        return new TargetNotFoundError(`target ${mutation.targetId} not found`);
+      }
+      target.applyMutation(mutation);
+    }
+
+    this._mirror = snapshotMirror;
+  }
+
+  clone() {
+    return Document.deserialize(this.toJSON());
   }
   private _construct(record: Record, createRecord: RecordCreator) {
     this._createRecord = createRecord;
-    this._mirror = record;
-    this._table = new Table(this._mirror);
+    this._mutations = [];
+    this._snapshot = new Table(record.clone());
+    this._mirror = this._snapshot.clone();
   }
 
   /**
@@ -76,7 +86,8 @@ export class Document<TState> {
    */
 
   static initialize = <TState>(initialState?: TState) => {
-    const createRecord = $recordCreator(generateId);
+    let idCount = 0;
+    const createRecord = $recordCreator(() => `${seed}${++idCount}`);
     const doc = new Document<TState>();
     doc._construct(createRecord(initialState || {}), createRecord);
     return doc;
@@ -91,11 +102,4 @@ export class Document<TState> {
     doc._construct(record, $recordCreator(generateId));
     return doc;
   }
-}
-
-const seed = `${Math.round(Math.random() * 9999)}`;
-let _idCount = 0;
-
-const generateId = () => {
-  return `${seed}${++_idCount}`;
 }

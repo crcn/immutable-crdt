@@ -1,6 +1,7 @@
-import { KeyValue } from "./utils";
+import { KeyValue, generateId } from "./utils";
 import { Observable } from "./observable";
-import { Mutation, MutationType, Insert, Append } from "./mutations";
+import { Mutation, MutationType, Insert, MoveListItem } from "./mutations";
+import { TargetNotFoundError } from "./errors";
 
 export enum RecordType {
   MAP = "MAP",
@@ -50,7 +51,13 @@ export abstract class BaseRecord<TType extends RecordType, TData extends BaseRec
       }
     }
   }
-  abstract clone();
+  clone() {
+    const clone = this._clone();
+    clone._jsonCache = this._jsonCache;
+    clone._stateCache = this._stateCache;
+    return clone;
+  }
+  protected abstract _clone();
   protected abstract _getState(): any;
   protected abstract _toJSON(): TData;
 
@@ -109,32 +116,65 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   applyMutation(mutation: Mutation) {
     super.applyMutation(mutation);
     switch(mutation.type) {
-      case MutationType.APPEND: {
-        this.push($castRecord(mutation.value));
-        break;
-      }
       case MutationType.INSERT: {
-        const beforeIndex = this._items.findIndex(item => item.id === mutation.before);
+        if (mutation.beforeId == null) {
+          this.push($castRecord(mutation.value));
+          break;
+        }
+
+        const beforeIndex = this._items.findIndex(item => item.id === mutation.beforeId);
         // TODO - return conflict if before not found
         this.insert(beforeIndex, $castRecord(mutation.value));
         break;
       }
+      case MutationType.MOVE_LIST_ITEM: {
+        const itemIndex = this._items.findIndex(item => item.id === mutation.itemId);
+        if (itemIndex === -1) {
+          return new TargetNotFoundError(`${mutation.itemId} does not exist`);
+        }
+
+        if (mutation.beforeId == null) {
+          this.move(itemIndex, this._items.length);
+          break;
+        }
+
+        const beforeIndex = this._items.findIndex(item => item.id === mutation.beforeId);
+
+        if (beforeIndex === -1) {
+          return new TargetNotFoundError(`${mutation.beforeId} does not exist`);
+        }
+        
+        this.move(itemIndex, beforeIndex);
+        break;
+      }
+      case MutationType.REPLACE_LIST_ITEM: {
+        const itemIndex = this._items.findIndex(item => item.id === mutation.itemId);
+        if (itemIndex === -1) {
+          return new TargetNotFoundError(`${mutation.itemId} does not exist`);
+        }
+        this.replace(itemIndex, $castRecord(mutation.value));
+        break;
+      }
     }
-    this.changeObservable.dispatch(mutation);
   }
-  clone() {
+  _clone() {
     return new List(this.id, this._items.map(item => {
-      return item.clone()
+      return item.clone();
     }));
   }
   insert(index: number, item: Record) {
     this.linkChild(item);
     this._items.splice(index, 0, item);
     if (index < this._items.length - 1) {
-      this.changeObservable.dispatch({ type: MutationType.INSERT, before: this._items[index + 1].id, value: item, timestamp: Date.now(), targetId: this.id });
+      this.changeObservable.dispatch({ id: generateId(), type: MutationType.INSERT, beforeId: this._items[index + 1].id, value: item, timestamp: Date.now(), targetId: this.id });
     } else {
-      this.changeObservable.dispatch({ type: MutationType.APPEND, targetId: this.id, value: item, timestamp: Date.now() });
+      this.changeObservable.dispatch({  id: generateId(), type: MutationType.INSERT, beforeId: null, targetId: this.id, value: item, timestamp: Date.now() });
     }
+  }
+  replace(index: number, item: Record) {
+    const oldItem = this._items[index];
+    this._items.splice(index, 1, item);
+    this.changeObservable.dispatch({  id: generateId(), type: MutationType.REPLACE_LIST_ITEM, itemId: oldItem.id, targetId: this.id, value: item, timestamp: Date.now() });
   }
   remove(item: Record) {
     const index = this._items.findIndex(existing => existing.id === item.id);
@@ -143,6 +183,13 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     }
     this.removeAt(index);
   }
+  move(oldIndex: number, newIndex: number) {
+    const item = this._items[oldIndex];
+    const before = this._items[newIndex];
+    this._items.splice(oldIndex, 1);
+    this._items.splice(newIndex, 0, item);
+    this.changeObservable.dispatch({  id: generateId(), type: MutationType.MOVE_LIST_ITEM, itemId: item.id, targetId: this.id, beforeId: before && before.id, timestamp: Date.now() });
+  }
   removeAt(index: number) {
     const item = this._items[index];
     if (!item) {
@@ -150,7 +197,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     }
     this._items.splice(index, 1);
     this.unlinkChild(item);
-    this.changeObservable.dispatch({ type: MutationType.DELETE, targetId: item.id, timestamp: Date.now() });
+    this.changeObservable.dispatch({ id: generateId(),  type: MutationType.DELETE, targetId: item.id, timestamp: Date.now() });
   }
   traverse(handler: ItemTraverser) {
     super.traverse(handler);
@@ -187,7 +234,7 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
   get properties() {
     return this._properties;
   }
-  clone() {
+  _clone() {
     const clonedProperties = {};
     for (const key in this._properties) {
       clonedProperties[key] = this._properties[key];
@@ -196,22 +243,25 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
   }
   applyMutation(mutation: Mutation) {
     super.applyMutation(mutation);
-    this.changeObservable.dispatch(mutation);
+    switch(mutation.type) {
+      case MutationType.MAP_SET: {
+        this.setValue(mutation.propertyName, $castRecord(mutation.value));
+        break;
+      }
+    }
   }
   setValue(propertyName: string, value: Record) {
     if (value) {
       this.linkChild(value);
-    }
-    if (this._properties[propertyName]) {
-      this.unlinkChild(this._properties[propertyName]);
-      this.changeObservable.dispatch({ type: MutationType.DELETE, targetId: this._properties[propertyName].id, timestamp: Date.now() });
     }
     if (value == null) {
       delete this._properties[propertyName];
     } else {
       this._properties[propertyName] = value;
     }
-    this.changeObservable.dispatch({ type: MutationType.MAP_SET, targetId: this.id, propertyName, value, timestamp: Date.now() });
+    if (value) {
+      this.changeObservable.dispatch({  id: generateId(), type: MutationType.MAP_SET, targetId: this.id, propertyName, value, timestamp: Date.now() });
+    }
   }
   remove(value: Record) {
     for (const propertyName in this._properties) {
@@ -271,7 +321,7 @@ export class Primitive extends BaseRecord<RecordType.PRIMITIVE, PrimitiveData> i
   get value() {
     return this._value;
   }
-  clone() {
+  _clone() {
     return new Primitive(this.id, this._value);
   }
   applyMutation(mutation: Mutation) {
