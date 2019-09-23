@@ -73,6 +73,9 @@ export abstract class BaseRecord<TType extends RecordType, TData extends BaseRec
 
 abstract class BaseParent<TType extends RecordType, TData extends BaseRecordData<TType>> extends BaseRecord<TType, TData> {
   protected linkChild(child: Record) {
+    if (child.$$parent === this) {
+      throw new Error(`cannot link child to parent twice.`);
+    }
     child.$$parent = this;
     if (isParentRecord(child)) {
       child.changeObservable.observe(this.changeObservable.dispatch);
@@ -103,14 +106,13 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     super(id, RecordType.LIST);
     this._items = items;
     for (let i = 0, {length} = this._items; i < length; i++) {
-      this._items[i].$$parent = this;
+      this.linkChild(this._items[i]);
     }
   }
   get items() {
     return this._items;
   }
   push(item: Record) {
-    this.linkChild(item);
     this.insert(this._items.length, item);
   }
   applyMutation(mutation: Mutation) {
@@ -164,17 +166,22 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   }
   insert(index: number, item: Record) {
     this.linkChild(item);
+    const before = this._items[index];
     this._items.splice(index, 0, item);
-    if (index < this._items.length - 1) {
-      this.changeObservable.dispatch({ id: generateId(), type: MutationType.INSERT, beforeId: this._items[index + 1].id, value: item, timestamp: Date.now(), targetId: this.id });
+
+    if (before) {
+      this.changeObservable.dispatch({ id: generateId(), type: MutationType.INSERT, beforeId: before.id, value: item,  targetId: this.id });
     } else {
-      this.changeObservable.dispatch({  id: generateId(), type: MutationType.INSERT, beforeId: null, targetId: this.id, value: item, timestamp: Date.now() });
+      this.changeObservable.dispatch({  id: generateId(), type: MutationType.INSERT, beforeId: null, targetId: this.id, value: item,  });
     }
   }
   replace(index: number, item: Record) {
     const oldItem = this._items[index];
     this._items.splice(index, 1, item);
-    this.changeObservable.dispatch({  id: generateId(), type: MutationType.REPLACE_LIST_ITEM, itemId: oldItem.id, targetId: this.id, value: item, timestamp: Date.now() });
+    this.changeObservable.dispatch({  id: generateId(), type: MutationType.REPLACE_LIST_ITEM, itemId: oldItem.id, targetId: this.id, value: item,  });
+  }
+  indexOf(item: Record) {
+    return this._items.indexOf(item);
   }
   remove(item: Record) {
     const index = this._items.findIndex(existing => existing.id === item.id);
@@ -188,7 +195,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     const before = this._items[newIndex];
     this._items.splice(oldIndex, 1);
     this._items.splice(newIndex, 0, item);
-    this.changeObservable.dispatch({  id: generateId(), type: MutationType.MOVE_LIST_ITEM, itemId: item.id, targetId: this.id, beforeId: before && before.id, timestamp: Date.now() });
+    this.changeObservable.dispatch({  id: generateId(), type: MutationType.MOVE_LIST_ITEM, itemId: item.id, targetId: this.id, beforeId: before && before.id,  });
   }
   removeAt(index: number) {
     const item = this._items[index];
@@ -197,7 +204,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     }
     this._items.splice(index, 1);
     this.unlinkChild(item);
-    this.changeObservable.dispatch({ id: generateId(),  type: MutationType.DELETE, targetId: item.id, timestamp: Date.now() });
+    this.changeObservable.dispatch({ id: generateId(),  type: MutationType.DELETE, targetId: item.id });
   }
   traverse(handler: ItemTraverser) {
     super.traverse(handler);
@@ -228,7 +235,7 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
     super(id, RecordType.MAP);
     this._properties = properties;
     for (const key in this._properties) {
-      this._properties[key].$$parent = this;
+      this.linkChild(this._properties[key]);
     }
   }
   get properties() {
@@ -248,19 +255,36 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
         this.setValue(mutation.propertyName, $castRecord(mutation.value));
         break;
       }
+      case MutationType.MAP_UNSET: {
+        this.removeValue(mutation.propertyName);
+        break;
+      }
     }
+  }
+  getKey(value: Record) {
+    for (const key in this._properties) {
+      if (this._properties[key] === value) {
+        return key;
+      }
+    }
+    return null;
   }
   setValue(propertyName: string, value: Record) {
     if (value) {
       this.linkChild(value);
     }
+    const oldItem = this._properties[propertyName];
+
+    if (oldItem) {
+      this.unlinkChild(oldItem);
+    }
+
     if (value == null) {
       delete this._properties[propertyName];
+      this.changeObservable.dispatch({  id: generateId(), type: MutationType.MAP_UNSET, oldValueId: oldItem && oldItem.id,  targetId: this.id, propertyName,  });
     } else {
       this._properties[propertyName] = value;
-    }
-    if (value) {
-      this.changeObservable.dispatch({  id: generateId(), type: MutationType.MAP_SET, targetId: this.id, propertyName, value, timestamp: Date.now() });
+      this.changeObservable.dispatch({  id: generateId(), type: MutationType.MAP_SET, targetId: this.id, propertyName, value,  });
     }
   }
   remove(value: Record) {
@@ -391,5 +415,5 @@ export const $deserializeRecord = (item: RecordData) => {
 }
 
 const $castRecord = (record: RecordData) => {
-  return record instanceof BaseRecord ? record : $deserializeRecord(record);
+  return record instanceof BaseRecord ? record.clone() : $deserializeRecord(record);
 }

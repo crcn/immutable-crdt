@@ -38,6 +38,11 @@ export class Table {
         this._items[mutation.value.id] = mutation.value as Record;
         break;
       }
+      case MutationType.MAP_UNSET: {
+        
+        delete this._items[mutation.oldValueId];
+        break;
+      }
       case MutationType.MAP_SET:
       case MutationType.INSERT: {
         if (mutation.value == null) {

@@ -1,10 +1,11 @@
 import { Observable } from "./observable";
 import { Mutation, sortMutations } from "./mutations";
 import {CRDTError, TargetNotFoundError} from "./errors";
-import { diff, patchRecord } from "./ot";
+import {  patchRecord } from "./ot";
+import { diff } from "immutable-ot";
 import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator } from "./records";
 import {Table} from "./table";
-import { generateId, seed } from "./utils";
+import { generateId } from "./utils";
 
 type DocumentData = {} & RecordData;
 
@@ -40,6 +41,7 @@ export class Document<TState> {
     // collects mutations as operational transforms are applied to the state mirror record
     mirrorRecord.changeObservable.observe(onMutation);    
 
+
     // apply the operational transforms to the mirror record
     patchRecord(mirrorRecord, ots, this._createRecord);
     mirrorRecord.changeObservable.unobserve(onMutation);
@@ -59,15 +61,22 @@ export class Document<TState> {
     this._mutations = sortMutations(this._mutations.concat(mutations));
     const snapshotMirror = this._mirror.clone();
 
+    const results = [];
+
     for (const mutation of this._mutations) {
       const target = snapshotMirror.getItem(mutation.targetId);
       if (!target) {
         return new TargetNotFoundError(`target ${mutation.targetId} not found`);
       }
-      target.applyMutation(mutation);
+      const result = target.applyMutation(mutation);
+      if (result) {
+        results.push(result);
+      }
     }
 
     this._mirror = snapshotMirror;
+
+    return results;
   }
 
   clone() {
@@ -86,8 +95,7 @@ export class Document<TState> {
    */
 
   static initialize = <TState>(initialState?: TState) => {
-    let idCount = 0;
-    const createRecord = $recordCreator(() => `${seed}${++idCount}`);
+    const createRecord = $recordCreator(generateId);
     const doc = new Document<TState>();
     doc._construct(createRecord(initialState || {}), createRecord);
     return doc;

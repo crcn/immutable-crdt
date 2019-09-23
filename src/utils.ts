@@ -38,10 +38,26 @@ export const arraySplice = <T>(
   ...target.slice(index + count)
 ];
 
+const INT_16 = 65536;
 
-export const seed = `${Math.round(Math.random() * 9999)}`;
-let _idCount = 0;
+let _idCounter = 0;
+const MACHINE_ID = Math.floor(Math.random() * (INT_16)).toString(16);
+const PID = Math.floor(Math.random() * (INT_16)).toString(16);
 
 export const generateId = () => {
-  return `${seed}${++_idCount}`;
-}
+  const ts = Math.floor(Date.now() / 1000).toString(16);
+  const count = (_idCounter++).toString(16);
+  return "00000000".substr(0, 8 - ts.length) + ts +
+    "000000".substr(0, 6 - MACHINE_ID.length) + MACHINE_ID +
+    "0000".substr(0, 4 - PID.length) + PID +
+    "000000".substr(0, 6 - count.length) + count;
+};
+
+export const getIDParts = (id: string) => {
+  var ctr = 0;
+  var timestamp   = parseInt(id.slice(ctr, ctr+=8), 16);
+  var machineID   = parseInt(id.slice(ctr, ctr+=6), 16);
+  var processID   = parseInt(id.slice(ctr, ctr+=4), 16);
+  var counter     = parseInt(id.slice(ctr, ctr+=6), 16);
+  return { timestamp, machineID, processID, counter};
+};

@@ -1,19 +1,19 @@
 import { RecordData } from "./records";
+import { getIDParts } from "./utils";
 
 export enum MutationType {
   INSERT = "INSERT",
-  APPEND = "APPEND",
   DELETE = "DELETE",
   REPLACE_LIST_ITEM = "REPLACE_LIST_ITEM",
   MOVE_LIST_ITEM = "MOVE_LIST_ITEM",
   MAP_SET = "MAP_SET",
+  MAP_UNSET = "MAP_UNSET",
 };
 
 export type BaseMutation<TType extends MutationType> = {
   id: string;
   type: TType,
-  targetId: string,
-  timestamp: number
+  targetId: string
 };
 
 export type Insert = {
@@ -39,17 +39,17 @@ export type MapSet = {
   value: RecordData;
 } & BaseMutation<MutationType.MAP_SET>;
 
-export type Mutation = Insert | Delete | MapSet | ReplaceListItem | MoveListItem;
+export type MapUnset = {
+  oldValueId: string;
+  propertyName: string;
+} & BaseMutation<MutationType.MAP_UNSET>;
+
+export type Mutation = Insert | Delete | MapSet | MapUnset | ReplaceListItem | MoveListItem;
 
 export const sortMutations = (mutations: Mutation[]) => {
   return [...mutations].sort((a, b) => {
-    if (a.timestamp > b.timestamp) {
-      return 1;
-
-    // unlikely, but 
-    } else if (a.timestamp === b.timestamp) {
-      return a.id > b.id ? 1 : -1;
-    } 
-    return -1;
+    const aParts = getIDParts(a.id);
+    const bParts = getIDParts(b.id);
+    return aParts.timestamp > bParts.timestamp || aParts.machineID > bParts.machineID || aParts.counter > bParts.counter ? 1 : -1;
   })
 };

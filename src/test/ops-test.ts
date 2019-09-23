@@ -5,7 +5,7 @@ describe(__filename + "#", () => {
     [
       [1, 1, 1], 
       [1, 2, 1], 
-      ["REPLACE_LIST_ITEM"]
+      ["INSERT", "DELETE"]
     ],
     [
       ["a", "b", "c"], 
@@ -15,7 +15,7 @@ describe(__filename + "#", () => {
     [
       ["a", "b", "b"], 
       ["b", "a", "a"], 
-      ["MOVE_LIST_ITEM", "DELETE", "INSERT"]
+      ["MOVE_LIST_ITEM", "REPLACE_LIST_ITEM"]
     ],
     [
       { a: "b" }, 
