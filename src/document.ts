@@ -28,15 +28,21 @@ export class Document<TState> {
    */
 
   private _mirror: Table;
+
+  private _currentState: TState;
   
   updateState(newState: TState): Mutation[] {
 
+    // first capture the operational transforms between the old & new state. Note that we use _currentState
+    // since it's usually coming from an external source -- diffing should be faster.
+    const ots = diff(this._currentState, newState);
+    this._currentState = newState;
+
     const mirrorRecord = this._mirror.getRoot();
 
-    // first capture the operational transforms between the old & new state
-    const ots = diff(mirrorRecord.getState(), newState);
     const mutations = [];
     const onMutation = (mutation: Mutation) => mutations.push(mutation);
+
 
     // collects mutations as operational transforms are applied to the state mirror record
     mirrorRecord.changeObservable.observe(onMutation);    
@@ -55,7 +61,7 @@ export class Document<TState> {
     return this._mirror.getRoot().toJSON();
   }
   getState() {
-    return this._mirror.getRoot().getState();
+    return this._currentState;
   }
   applyMutations(mutations: Mutation[]) {
     this._mutations = sortMutations(this._mutations.concat(mutations));
@@ -76,8 +82,11 @@ export class Document<TState> {
 
     this._mirror = snapshotMirror;
 
+    this._resetCurrentState();
+
     return results;
   }
+  
 
   clone() {
     return Document.deserialize(this.toJSON());
@@ -87,6 +96,11 @@ export class Document<TState> {
     this._mutations = [];
     this._snapshot = new Table(record.clone());
     this._mirror = this._snapshot.clone();
+    this._resetCurrentState();
+  }
+
+  private _resetCurrentState() {
+    this._currentState = this._mirror.getRoot().getState();
   }
 
   /**
