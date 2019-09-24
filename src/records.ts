@@ -383,7 +383,7 @@ export const $recordCreator = (generateId: () => string): RecordCreator => {
       return new Map(generateId(), properties);
     } else {
       const tov = typeof value;
-      if (!tov || tov === "string" || tov === "number" || tov === "boolean") {
+      if (value == null || tov === "string" || tov === "number" || tov === "boolean") {
         return new Primitive(generateId(), value as PrimitiveValue);
       }
     }
