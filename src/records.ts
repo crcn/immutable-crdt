@@ -2,6 +2,7 @@ import { KeyValue, generateId } from "./utils";
 import { Observable } from "./observable";
 import { Mutation, MutationType, Insert, MoveListItem } from "./mutations";
 import { TargetNotFoundError } from "./errors";
+import {Adapter as OTDiffAdapter, defaultAdapter as defaultOTDiffAdapter} from "immutable-ot";
 
 export enum RecordType {
   MAP = "MAP",
@@ -11,7 +12,8 @@ export enum RecordType {
 
 export type BaseRecordData<TType extends RecordType> = {
   id: string;
-  type: TType
+  type: TType;
+  castName: string;
 };
 
 type ItemTraverser = (item: BaseRecord<any, any>) => void;
@@ -23,7 +25,7 @@ export abstract class BaseRecord<TType extends RecordType, TData extends BaseRec
   private _jsonCache?: TData;
   private _stateCache?: any;
   readonly changeObservable = new Observable<Mutation>();
-  constructor(id: string, type: TType) {
+  constructor(id: string, type: TType, protected _adapter: RecordAdapter, readonly castName: string) {
     this.id = id;
     this.type = type;
     this.changeObservable.observe(this._onChange);
@@ -102,8 +104,8 @@ type ListData = {
 
 export class List extends BaseParent<RecordType.LIST, ListData> implements ListData {
   private _items: Record[];
-  constructor(id: string, items: Record[]) {
-    super(id, RecordType.LIST);
+  constructor(id: string, items: Record[], adapter: RecordAdapter, className: string) {
+    super(id, RecordType.LIST, adapter, className);
     this._items = items;
     for (let i = 0, {length} = this._items; i < length; i++) {
       this.linkChild(this._items[i]);
@@ -120,13 +122,13 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     switch(mutation.type) {
       case MutationType.INSERT: {
         if (mutation.beforeId == null) {
-          this.push($castRecord(mutation.value));
+          this.push($castRecord(mutation.value, this._adapter));
           break;
         }
 
         const beforeIndex = this._items.findIndex(item => item.id === mutation.beforeId);
         // TODO - return conflict if before not found
-        this.insert(beforeIndex, $castRecord(mutation.value));
+        this.insert(beforeIndex, $castRecord(mutation.value, this._adapter));
         break;
       }
       case MutationType.MOVE_LIST_ITEM: {
@@ -154,7 +156,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
         if (itemIndex === -1) {
           return new TargetNotFoundError(`${mutation.itemId} does not exist`);
         }
-        this.replace(itemIndex, $castRecord(mutation.value));
+        this.replace(itemIndex, $castRecord(mutation.value, this._adapter));
         break;
       }
     }
@@ -162,7 +164,7 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   _clone() {
     return new List(this.id, this._items.map(item => {
       return item.clone();
-    }));
+    }), this._adapter, this.castName);
   }
   insert(index: number, item: Record) {
     this.linkChild(item);
@@ -217,11 +219,12 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     return {
       id: this.id,
       type: this.type,
-      items: this._items.map(item => item.toJSON())
+      items: this._items.map(item => item.toJSON()),
+      castName: this.castName,
     }
   }
   _getState() {
-    return this._items.map(item => item.getState())
+    return this._adapter.castValue(this._items.map(item => item.getState()), this.castName);
   }
 }
 
@@ -231,8 +234,8 @@ type MapData = {
 
 export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData {
   _properties: KeyValue<Record>;
-  constructor(id: string, properties: KeyValue<Record>) {
-    super(id, RecordType.MAP);
+  constructor(id: string, properties: KeyValue<Record>,adapter: RecordAdapter,  className: string) {
+    super(id, RecordType.MAP, adapter, className);
     this._properties = properties;
     for (const key in this._properties) {
       this.linkChild(this._properties[key]);
@@ -246,13 +249,13 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
     for (const key in this._properties) {
       clonedProperties[key] = this._properties[key];
     }
-    return new Map(this.id, clonedProperties);
+    return new Map(this.id, clonedProperties, this._adapter, this.castName);
   }
   applyMutation(mutation: Mutation) {
     super.applyMutation(mutation);
     switch(mutation.type) {
       case MutationType.MAP_SET: {
-        this.setValue(mutation.propertyName, $castRecord(mutation.value));
+        this.setValue(mutation.propertyName, $castRecord(mutation.value, this._adapter));
         break;
       }
       case MutationType.MAP_UNSET: {
@@ -318,6 +321,7 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
       id: this.id,
       type: this.type,
       properties,
+      castName: this.castName,
     }
   }
   _getState() {
@@ -325,7 +329,7 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
     for (const key in this._properties) {
       state[key] = this._properties[key].getState();
     }
-    return state;
+    return this._adapter.castValue(state, this.castName);
   }
 }
 
@@ -338,15 +342,15 @@ export type PrimitiveData = {
 
 export class Primitive extends BaseRecord<RecordType.PRIMITIVE, PrimitiveData> implements PrimitiveData {
   _value: PrimitiveValue;
-  constructor(id: string, value: PrimitiveValue) {
-    super(id, RecordType.PRIMITIVE);
+  constructor(id: string, value: PrimitiveValue, adapter: RecordAdapter, className: string) {
+    super(id, RecordType.PRIMITIVE, adapter, className);
     this._value = value;
   }
   get value() {
     return this._value;
   }
   _clone() {
-    return new Primitive(this.id, this._value);
+    return new Primitive(this.id, this._value, this._adapter, this.castName);
   }
   applyMutation(mutation: Mutation) {
     super.applyMutation(mutation);
@@ -356,11 +360,12 @@ export class Primitive extends BaseRecord<RecordType.PRIMITIVE, PrimitiveData> i
     return {
       id: this.id,
       type: this.type,
-      value: this._value
+      value: this._value,
+      castName: this.castName,
     }
   }
   _getState() {
-    return this.value;
+    return this._adapter.castValue(this.value, this.castName);
   }
 }
 
@@ -368,23 +373,41 @@ export type Record = Map | List | Primitive;
 export type RecordData = MapData | ListData | PrimitiveData;
 export type RecordCreator = (value: Object) => Record;
 
-export const $recordCreator = (generateId: () => string): RecordCreator => {
+const map = (list: any, mapper: any, adapter: OTDiffAdapter) => {
+  const newItems = [];
+  adapter.each(list, (value) => newItems.push(mapper(value)));
+  return newItems;
+};
+
+export type RecordAdapter = {
+  getCastName(value): string;
+  castValue(value, as: string): any;
+} & OTDiffAdapter;
+
+export const defaultAdapter = {
+  ...defaultOTDiffAdapter,
+  getCastName(value) {
+    return value == null ? null : value.constructor.name;
+  },
+  castValue(value) {
+    return value;
+  }
+};
+
+export const $recordCreator = (generateId: () => string, adapter: RecordAdapter = defaultAdapter): RecordCreator => {
   const createRecord = (value: Object) => {
-    if (Array.isArray(value)) {
-      return new List(generateId(), value.map(createRecord));
+    if (adapter.isList(value)) {
+      return new List(generateId(), map(value, createRecord, adapter), adapter, adapter.getCastName(value));
     } else if (value && typeof value === "object") {
-      if (value.constructor !== Object) {
-        throw new Error(`Unable to use ${value.constructor.name} in CRDT document. value must only extend Object, Array, String, Boolean, or Number.`);
-      }
       const properties = {};
-      for (const key in value) {
-        properties[key] = createRecord(value[key]);
-      }
-      return new Map(generateId(), properties);
+      adapter.each(value, (item, key) => {
+        properties[key] = createRecord(item);
+      });
+      return new Map(generateId(), properties, adapter, adapter.getCastName(value));
     } else {
       const tov = typeof value;
       if (value == null || tov === "string" || tov === "number" || tov === "boolean") {
-        return new Primitive(generateId(), value as PrimitiveValue);
+        return new Primitive(generateId(), value as PrimitiveValue, adapter, adapter.getCastName(value));
       }
     }
     throw new Error(`Unsupported primitive ${value}.`);
@@ -393,27 +416,27 @@ export const $recordCreator = (generateId: () => string): RecordCreator => {
   return createRecord;
 }
 
-export const $deserializeRecord = (item: RecordData) => {
+export const $deserializeRecord = (item: RecordData, adapter: RecordAdapter) => {
   if (item.constructor !== Object) {
     throw new Error(`deserialized object must be vanilla`);
   }
   switch(item.type) {
     case RecordType.PRIMITIVE: {
-      return new Primitive(item.id, item.value);
+      return new Primitive(item.id, item.value, adapter, item.castName);
     }
     case RecordType.MAP: {
       const properties = {};
       for (const key in item.properties) {
-        properties[key] = $deserializeRecord(item.properties[key]);
+        properties[key] = $deserializeRecord(item.properties[key], adapter);
       }
-      return new Map(item.id, properties);
+      return new Map(item.id, properties, adapter, item.castName);
     }
     case RecordType.LIST: {
-      return new List(item.id, item.items.map($deserializeRecord));
+      return new List(item.id, item.items.map(value => $deserializeRecord(value, adapter)), adapter, item.castName);
     }
   }
 }
 
-const $castRecord = (record: RecordData) => {
-  return record instanceof BaseRecord ? record.clone() : $deserializeRecord(record);
+const $castRecord = (record: RecordData, adapter: RecordAdapter) => {
+  return record instanceof BaseRecord ? record.clone() : $deserializeRecord(record, adapter);
 }

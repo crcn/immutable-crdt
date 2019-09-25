@@ -2,8 +2,8 @@ import { Observable } from "./observable";
 import { Mutation, sortMutations } from "./mutations";
 import {CRDTError, TargetNotFoundError} from "./errors";
 import {  patchRecord } from "./ot";
-import { diff } from "immutable-ot";
-import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator } from "./records";
+import { diff, Adapter as OTDiffAdapter } from "immutable-ot";
+import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator, defaultAdapter, RecordAdapter } from "./records";
 import {Table} from "./table";
 import { generateId } from "./utils";
 
@@ -30,12 +30,14 @@ export class Document<TState> {
   private _mirror: Table;
 
   private _currentState: TState;
+
+  private _adapter: OTDiffAdapter;
   
   updateState(newState: TState): Mutation[] {
 
     // first capture the operational transforms between the old & new state. Note that we use _currentState
     // since it's usually coming from an external source -- diffing should be faster.
-    const ots = diff(this._currentState, newState);
+    const ots = diff(this._currentState, newState, { adapter: this._adapter });
     this._currentState = newState;
 
     const mirrorRecord = this._mirror.getRoot();
@@ -91,6 +93,11 @@ export class Document<TState> {
   clone() {
     return Document.deserialize(this.toJSON());
   }
+
+  constructor(adapter: OTDiffAdapter) {
+    this._adapter = adapter;
+  }
+
   private _construct(record: Record, createRecord: RecordCreator) {
     this._createRecord = createRecord;
     this._mutations = [];
@@ -108,9 +115,9 @@ export class Document<TState> {
    * at the time of `initialState` creation.
    */
 
-  static initialize = <TState>(initialState?: TState) => {
-    const createRecord = $recordCreator(generateId);
-    const doc = new Document<TState>();
+  static initialize = <TState>(initialState?: TState, adapter: RecordAdapter = defaultAdapter) => {
+    const createRecord = $recordCreator(generateId, adapter);
+    const doc = new Document<TState>(adapter);
     doc._construct(createRecord(initialState || {}), createRecord);
     return doc;
   }
@@ -118,9 +125,9 @@ export class Document<TState> {
   /**
    */
 
-  static deserialize = <TState>(data: DocumentData) => {
-    const record = $deserializeRecord(data);
-    const doc = new Document<TState>();
+  static deserialize = <TState>(data: DocumentData, adapter: RecordAdapter = defaultAdapter) => {
+    const record = $deserializeRecord(data, adapter);
+    const doc = new Document<TState>(adapter);
     doc._construct(record, $recordCreator(generateId));
     return doc;
   }
