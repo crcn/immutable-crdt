@@ -49,6 +49,7 @@ const adapter: RecordAdapter = {
   getCastName(value) {
     for (const key in classes) {
       if (value instanceof classes[key]) {
+        console.log("IS", key);
         return key;
       }
     }
