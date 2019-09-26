@@ -49,7 +49,6 @@ const adapter: RecordAdapter = {
   getCastName(value) {
     for (const key in classes) {
       if (value instanceof classes[key]) {
-        console.log("IS", key);
         return key;
       }
     }
@@ -58,7 +57,8 @@ const adapter: RecordAdapter = {
   castValue(value, as) {
     const clazz = classes[as];
     return clazz ? clazz(value) : value;
-  }
+  },
+  get: (object, key) => object.get ? object.get(key) : object[key]
 }
 
 describe(__filename + "#", () => {
