@@ -44,14 +44,21 @@ let _idCounter = 0;
 const MACHINE_ID = Math.floor(Math.random() * (INT_16)).toString(16);
 const PID = Math.floor(Math.random() * (INT_16)).toString(16);
 
-export const generateId = () => {
-  const ts = Math.floor(Date.now() / 1000).toString(16);
-  const count = (_idCounter++).toString(16);
-  return "00000000".substr(0, 8 - ts.length) + ts +
-    "000000".substr(0, 6 - MACHINE_ID.length) + MACHINE_ID +
-    "0000".substr(0, 4 - PID.length) + PID +
-    "000000".substr(0, 6 - count.length) + count;
+
+
+export const createIDGenerator = (machineId: string, pid: string, now: () => number, inc: () => number) => {
+  return () => {
+    const ts = Math.floor(now() / 1000).toString(16);
+    const count = inc().toString(16);
+    return "00000000".substr(0, 8 - ts.length) + ts +
+      "000000".substr(0, 6 - machineId.length) + machineId +
+      "0000".substr(0, 4 - pid.length) + pid +
+      "000000".substr(0, 6 - count.length) + count;
+  };
 };
+
+export const generateId = createIDGenerator(MACHINE_ID, PID, () => Date.now(), () => _idCounter++);
+
 
 export const getIDParts = (id: string) => {
   var ctr = 0;

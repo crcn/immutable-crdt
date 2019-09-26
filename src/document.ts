@@ -1,13 +1,18 @@
-import { Observable } from "./observable";
+
 import { Mutation, sortMutations } from "./mutations";
-import {CRDTError, TargetNotFoundError} from "./errors";
+import {TargetNotFoundError} from "./errors";
 import {  patchRecord } from "./ot";
 import { diff, Adapter as OTDiffAdapter } from "immutable-ot";
-import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator, defaultAdapter, RecordAdapter } from "./records";
+import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator, defaultAdapter, RecordAdapter, RecordOptions, DEFAULT_RECORD_OPTIONS } from "./records";
 import {Table} from "./table";
 import { generateId } from "./utils";
 
 type DocumentData = {} & RecordData;
+
+type InitializeOptions = {
+  adapter?: RecordAdapter,
+  generateId?: typeof generateId
+};
 
 
 export class Document<TState> {
@@ -31,13 +36,13 @@ export class Document<TState> {
 
   private _currentState: TState;
 
-  private _adapter: OTDiffAdapter;
+  private _options: RecordOptions;
   
   updateState(newState: TState): Mutation[] {
 
     // first capture the operational transforms between the old & new state. Note that we use _currentState
     // since it's usually coming from an external source -- diffing should be faster.
-    const ots = diff(this._currentState, newState, { adapter: this._adapter });
+    const ots = diff(this._currentState, newState, { adapter: this._options.adapter });
     this._currentState = newState;
 
     const mirrorRecord = this._mirror.getRoot();
@@ -74,11 +79,12 @@ export class Document<TState> {
     for (const mutation of this._mutations) {
       const target = snapshotMirror.getItem(mutation.targetId);
       if (!target) {
-        return new TargetNotFoundError(`target ${mutation.targetId} not found`);
-      }
-      const result = target.applyMutation(mutation);
-      if (result) {
-        results.push(result);
+        results.push(new TargetNotFoundError(`target ${mutation.targetId} not found`));
+      } else {
+        const result = target.applyMutation(mutation);
+        if (result) {
+          results.push(result);
+        }
       }
     }
 
@@ -91,11 +97,11 @@ export class Document<TState> {
   
 
   clone() {
-    return Document.deserialize(this.toJSON());
+    return Document.deserialize(this.toJSON(), this._options);
   }
 
-  constructor(adapter: OTDiffAdapter) {
-    this._adapter = adapter;
+  constructor(options: RecordOptions) {
+    this._options = options;
   }
 
   private _construct(record: Record, createRecord: RecordCreator) {
@@ -115,9 +121,10 @@ export class Document<TState> {
    * at the time of `initialState` creation.
    */
 
-  static initialize = <TState>(initialState?: TState, adapter: RecordAdapter = defaultAdapter) => {
-    const createRecord = $recordCreator(generateId, adapter);
-    const doc = new Document<TState>(adapter);
+  static initialize = <TState>(initialState?: TState, options?: Partial<RecordOptions>) => {
+    const _options = Object.assign({}, DEFAULT_RECORD_OPTIONS, options);
+    const createRecord = $recordCreator(options);
+    const doc = new Document<TState>(_options);
     doc._construct(createRecord(initialState || {}), createRecord);
     return doc;
   }
@@ -125,10 +132,11 @@ export class Document<TState> {
   /**
    */
 
-  static deserialize = <TState>(data: DocumentData, adapter: RecordAdapter = defaultAdapter) => {
-    const record = $deserializeRecord(data, adapter);
-    const doc = new Document<TState>(adapter);
-    doc._construct(record, $recordCreator(generateId));
+  static deserialize = <TState>(data: DocumentData, options?: Partial<RecordOptions>) => {
+    const _options = Object.assign({}, DEFAULT_RECORD_OPTIONS, options);
+    const record = $deserializeRecord(data, _options);
+    const doc = new Document<TState>(_options);
+    doc._construct(record, $recordCreator(options));
     return doc;
   }
 }

@@ -27,6 +27,7 @@ const classes = {
 
 const adapter: RecordAdapter = {
   isList: value => List.isList(value) || defaultAdapter.isList(value),
+  getListLength: value => value.size,
   isMap: value => value && typeof value === "object" && !List.isList(value) || defaultAdapter.isMap(value),
   each(value, iterator) {
     if (List.isList(value)) {
@@ -70,7 +71,7 @@ describe(__filename + "#", () => {
       ])
     });
 
-    const doc = Document.initialize(div, adapter);
+    const doc = Document.initialize(div, { adapter });
 
     const newDiv = div.updateIn(["children"], (children) => {
       return children.push(Text({ value: "world" }));
