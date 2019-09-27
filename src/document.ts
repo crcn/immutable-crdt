@@ -34,18 +34,17 @@ export class Document<TState> {
 
   private _mirror: Table;
 
-  private _currentState: TState;
 
   private _options: RecordOptions;
   
   updateState(newState: TState): Mutation[] {
 
+    const mirrorRecord = this._mirror.getRoot();
+
     // first capture the operational transforms between the old & new state. Note that we use _currentState
     // since it's usually coming from an external source -- diffing should be faster.
-    const ots = diff(this._currentState, newState, { adapter: this._options.adapter });
-    this._currentState = newState;
+    const ots = diff(mirrorRecord.getState(), newState, { adapter: this._options.adapter });
 
-    const mirrorRecord = this._mirror.getRoot();
 
     const mutations = [];
     const onMutation = (mutation: Mutation) => mutations.push(mutation);
@@ -68,7 +67,7 @@ export class Document<TState> {
     return this._mirror.getRoot().toJSON();
   }
   getState() {
-    return this._currentState;
+    return this._mirror.getRoot().getState();
   }
   applyMutations(mutations: Mutation[]) {
     this._mutations = sortMutations(this._mutations.concat(mutations));
@@ -89,9 +88,6 @@ export class Document<TState> {
     }
 
     this._mirror = snapshot;
-
-    this._resetCurrentState();
-
     return results;
   }
   
@@ -109,12 +105,8 @@ export class Document<TState> {
     this._mutations = [];
     this._snapshot = new Table(record.clone());
     this._mirror = this._snapshot.clone();
-    this._resetCurrentState();
   }
 
-  private _resetCurrentState() {
-    this._currentState = this._mirror.getRoot().getState();
-  }
 
   /**
    * Returns a new document from vanilla state object. Note that this should happen
