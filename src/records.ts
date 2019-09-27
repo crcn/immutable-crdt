@@ -247,7 +247,7 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
   _clone() {
     const clonedProperties = {};
     for (const key in this._properties) {
-      clonedProperties[key] = this._properties[key];
+      clonedProperties[key] = this._properties[key].clone();
     }
     return new Map(this.id, clonedProperties, this._options, this.castName);
   }
