@@ -50,6 +50,15 @@ export const sortMutations = (mutations: Mutation[]) => {
   return [...mutations].sort((a, b) => {
     const aParts = getIDParts(a.id);
     const bParts = getIDParts(b.id);
-    return aParts.timestamp > bParts.timestamp || aParts.machineID > bParts.machineID || aParts.counter > bParts.counter ? 1 : -1;
+
+    if (aParts.timestamp !== bParts.timestamp) {
+      return aParts.timestamp > bParts.timestamp ? 1 : -1;
+    }
+
+    if (aParts.counter !== bParts.counter) {
+      return aParts.counter > bParts.counter ? 1 : -1;
+    }
+
+    return aParts.machineID + aParts.processID > bParts.machineID + bParts.processID ? 1 : -1;
   })
 };

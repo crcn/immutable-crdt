@@ -29,27 +29,38 @@ export class Table {
   private _onRootChange = (mutation: Mutation) => {
     switch(mutation.type) {
       case MutationType.DELETE: {
-        delete this._items[mutation.targetId];
+        const value = this._items[mutation.targetId];
+        if (value != null) {
+          value.traverse(item => {
+            delete this._items[item.id];
+          });
+        }
         break;
       }
-
       case MutationType.REPLACE_LIST_ITEM: {
-        delete this._items[mutation.itemId];
-        this._items[mutation.value.id] = mutation.value as Record;
+        this._items[mutation.itemId].traverse(item => {
+          delete this._items[item.id];
+        });
+        (mutation.value as Record).traverse(item => {
+          this._items[item.id] = item as Record;
+        });
         break;
       }
       case MutationType.MAP_UNSET: {
-        
-        delete this._items[mutation.oldValueId];
+        const value = this._items[mutation.oldValueId];
+        if (value != null) {
+          value.traverse(item => {
+            delete this._items[item.id];
+          });
+        }
         break;
       }
       case MutationType.MAP_SET:
       case MutationType.INSERT: {
-        if (mutation.value == null) {
-          delete this._items[mutation.value.id];
-        } else {
-          this._items[mutation.value.id] = mutation.value as Record;
-        }
+        const value = mutation.value as Record;
+        value.traverse(item => {
+          this._items[item.id] = item as Record;
+        });
         break;
       }
     }
