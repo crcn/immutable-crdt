@@ -72,12 +72,12 @@ export class Document<TState> {
   }
   applyMutations(mutations: Mutation[]) {
     this._mutations = sortMutations(this._mutations.concat(mutations));
-    const snapshotMirror = this._mirror.clone();
+    const snapshot = this._snapshot.clone();
 
     const results = [];
 
     for (const mutation of this._mutations) {
-      const target = snapshotMirror.getItem(mutation.targetId);
+      const target = snapshot.getItem(mutation.targetId);
       if (!target) {
         results.push(new TargetNotFoundError(`target ${mutation.targetId} not found`));
       } else {
@@ -88,7 +88,7 @@ export class Document<TState> {
       }
     }
 
-    this._mirror = snapshotMirror;
+    this._mirror = snapshot;
 
     this._resetCurrentState();
 

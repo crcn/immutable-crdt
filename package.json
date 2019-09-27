@@ -1,6 +1,6 @@
 {
   "name": "immutable-crdt",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "A CRDT library that you can add to your existing codebase",
   "main": "index.js",
   "scripts": {
