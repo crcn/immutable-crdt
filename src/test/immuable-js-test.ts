@@ -47,6 +47,15 @@ const adapter: RecordAdapter = {
     }
     return defaultAdapter.each(value, iterator);
   },
+  typeEquals(a, b) {
+    return defaultAdapter.typeEquals(a, b);
+  },
+  equals(a, b) {
+    return a === b;
+  },
+  diffable(a, b) {
+    return true;
+  },
   getCastName(value) {
     for (const key in classes) {
       if (value instanceof classes[key]) {
