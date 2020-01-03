@@ -1,23 +1,16 @@
 
-import { Mutation, sortMutations } from "./mutations";
+import { Mutation } from "./mutations";
 import {TargetNotFoundError} from "./errors";
 import {  patchRecord } from "./ot";
-import { diff, Adapter as OTDiffAdapter } from "immutable-ot";
-import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator, defaultAdapter, RecordAdapter, RecordOptions, DEFAULT_RECORD_OPTIONS } from "./records";
+import { diff } from "immutable-ot";
+import { $recordCreator, Record, RecordData, $deserializeRecord, RecordCreator, RecordOptions, DEFAULT_RECORD_OPTIONS } from "./records";
 import {Table} from "./table";
-import { generateId } from "./utils";
 
 type DocumentData = {} & RecordData;
-
-type InitializeOptions = {
-  adapter?: RecordAdapter,
-  generateId?: typeof generateId
-};
 
 
 export class Document<TState> {
 
-  private _snapshot: Table;
 
   private _mutations: Mutation[];
 
@@ -32,14 +25,14 @@ export class Document<TState> {
    * CRDT mirror of the document state
    */
 
-  private _mirror: Table;
+  private _table: Table;
 
 
   private _options: RecordOptions;
   
   updateState(newState: TState): Mutation[] {
 
-    const mirrorRecord = this._mirror.getRoot();
+    const mirrorRecord = this._table.getRoot();
 
     // first capture the operational transforms between the old & new state. Note that we use _currentState
     // since it's usually coming from an external source -- diffing should be faster.
@@ -64,19 +57,17 @@ export class Document<TState> {
     return mutations;
   }
   toJSON(): DocumentData {
-    return this._mirror.getRoot().toJSON();
+    return this._table.getRoot().toJSON();
   }
   getState() {
-    return this._mirror.getRoot().getState();
+    return this._table.getRoot().getState();
   }
   applyMutations(mutations: Mutation[]) {
-    this._mutations = sortMutations(this._mutations.concat(mutations));
-    const snapshot = this._snapshot.clone();
-
+    this._mutations.push(...mutations);
     const results = [];
 
-    for (const mutation of this._mutations) {
-      const target = snapshot.getItem(mutation.targetId);
+    for (const mutation of mutations) {
+      const target = this._table.getItem(mutation.targetId);
       if (!target) {
         results.push(new TargetNotFoundError(`target ${mutation.targetId} not found`));
       } else {
@@ -87,7 +78,6 @@ export class Document<TState> {
       }
     }
 
-    this._mirror = snapshot;
     return results;
   }
   
@@ -103,12 +93,11 @@ export class Document<TState> {
   private _construct(record: Record, createRecord: RecordCreator) {
     this._createRecord = createRecord;
     this._mutations = [];
-    this._snapshot = new Table(record.clone());
-    this._mirror = this._snapshot.clone();
+    this._table = new Table(record.clone());
   }
 
   getRecord(id: string) {
-    return this._snapshot.getItem(id);
+    return this._table.getItem(id);
   }
 
 
