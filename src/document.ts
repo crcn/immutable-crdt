@@ -14,6 +14,8 @@ export class Document<TState> {
 
   private _mutations: Mutation[];
 
+  private _snapshot: Table;
+
 
   /**
    * Creates a new record from a vanilla state value
@@ -94,6 +96,7 @@ export class Document<TState> {
     this._createRecord = createRecord;
     this._mutations = [];
     this._table = new Table(record.clone());
+    this._snapshot = this._table.clone();
   }
 
   getRecord(id: string) {

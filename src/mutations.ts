@@ -12,8 +12,9 @@ export enum MutationType {
 
 export type BaseMutation<TType extends MutationType> = {
   id: string;
-  type: TType,
-  targetId: string
+  type: TType;
+  targetId: string;
+  targetPath: string[];
 };
 
 export type Insert = {

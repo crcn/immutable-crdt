@@ -184,15 +184,15 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     this._items.splice(index, 0, item);
 
     if (before) {
-      this.changeObservable.dispatch({ id: this._options.generateId(), type: MutationType.INSERT, beforeId: before.id, value: item,  targetId: this.id });
+      this.changeObservable.dispatch({ id: this._options.generateId(), type: MutationType.INSERT, beforeId: before.id, value: item,  targetId: this.id, targetPath: this.getPath() });
     } else {
-      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.INSERT, beforeId: null, targetId: this.id, value: item,  });
+      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.INSERT, beforeId: null, targetId: this.id, value: item, targetPath: this.getPath()  });
     }
   }
   replace(index: number, item: Record) {
     const oldItem = this._items[index];
     this._items.splice(index, 1, item);
-    this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.REPLACE_LIST_ITEM, itemId: oldItem.id, targetId: this.id, value: item,  });
+    this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.REPLACE_LIST_ITEM, itemId: oldItem.id, targetId: this.id, value: item, targetPath: this.getPath() });
   }
   indexOf(item: Record) {
     return this._items.indexOf(item);
@@ -209,16 +209,17 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
     const before = this._items[newIndex];
     this._items.splice(oldIndex, 1);
     this._items.splice(newIndex, 0, item);
-    this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MOVE_LIST_ITEM, itemId: item.id, targetId: this.id, beforeId: before && before.id,  });
+    this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MOVE_LIST_ITEM, itemId: item.id, targetId: this.id, beforeId: before && before.id, targetPath: this.getPath()  });
   }
   removeAt(index: number) {
     const item = this._items[index];
     if (!item) {
       return;
     }
+    const itemPath = item.getPath();
     this._items.splice(index, 1);
     this.unlinkChild(item);
-    this.changeObservable.dispatch({ id: this._options.generateId(),  type: MutationType.DELETE, targetId: item.id });
+    this.changeObservable.dispatch({ id: this._options.generateId(),  type: MutationType.DELETE, targetId: item.id, targetPath: itemPath });
   }
   traverse(handler: ItemTraverser) {
     super.traverse(handler);
@@ -296,10 +297,10 @@ export class Map extends BaseParent<RecordType.MAP, MapData> implements MapData 
 
     if (value == null) {
       delete this._properties[propertyName];
-      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MAP_UNSET, oldValueId: oldItem && oldItem.id,  targetId: this.id, propertyName,  });
+      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MAP_UNSET, oldValueId: oldItem && oldItem.id,  targetId: this.id, propertyName, targetPath: this.getPath() });
     } else {
       this._properties[propertyName] = value;
-      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MAP_SET, targetId: this.id, propertyName, value,  });
+      this.changeObservable.dispatch({  id: this._options.generateId(), type: MutationType.MAP_SET, targetId: this.id, propertyName, value, targetPath: this.getPath() });
     }
   }
   remove(value: Record) {
