@@ -27,4 +27,25 @@ describe(__filename + "#", () => {
     const doc2 = Document.deserialize(doc.toJSON());
     expect(doc2.getState()).to.eql(state);
   });
+
+  it("can return the path of a nested record", () => {
+    const state = {
+      a: {
+        b: "c",
+        d: [1, 2, 3, 4]
+      }
+    };
+
+    const newState = {
+      a: {
+        b: "cc",
+        d: [5, 6, 7, 8]
+      }
+    };
+
+    const doc = Document.initialize(state);
+    const mutations = doc.updateState(newState);
+    expect((mutations[8] as any).value.getPath()).to.eql(['a', 'b']);
+    expect((mutations[7] as any).value.getPath()).to.eql(['a', 'd', 3]);
+  });
 });

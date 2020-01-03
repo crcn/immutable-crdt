@@ -39,6 +39,14 @@ export abstract class BaseRecord<TType extends RecordType, TData extends BaseRec
     }
     return this._jsonCache = this._toJSON();
   }
+  getPath(): string[] {
+    const parent = this.$$parent;
+    if (!parent) {
+      return [];
+    }
+
+    return [...parent.getPath(), parent.getKey(this)];
+  }
   getState(): any {
     if (this._stateCache) {
       return this._stateCache;
@@ -85,6 +93,7 @@ abstract class BaseParent<TType extends RecordType, TData extends BaseRecordData
   }
 
   abstract remove(child: BaseRecord<any, any>);
+  abstract getKey(item: BaseRecord<any, any>);
 
   protected unlinkChild(child: Record) {
     child.$$parent = this;
@@ -113,6 +122,9 @@ export class List extends BaseParent<RecordType.LIST, ListData> implements ListD
   }
   get items() {
     return this._items;
+  }
+  getKey(item: Record) {
+    return this._items.indexOf(item);
   }
   push(item: Record) {
     this.insert(this._items.length, item);
