@@ -107,6 +107,10 @@ export class Document<TState> {
     this._mirror = this._snapshot.clone();
   }
 
+  getRecord(id: string) {
+    return this._snapshot.getItem(id);
+  }
+
 
   /**
    * Returns a new document from vanilla state object. Note that this should happen
